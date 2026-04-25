@@ -28,15 +28,17 @@ export const createOrGetChat = asyncHandler(async (req, res) => {
     res.status(201).json(chat);
 });
 
-// Get all chats for logged-in user with unread counts
 export const getChats = asyncHandler(async (req, res) => {
     const chats = await Chat.find({ participants: req.user.id })
         .populate("participants", "name email profilePic about")
         .populate("latestMessage")
         .sort({ updatedAt: -1 });
 
-    // For each chat, count messages that don't have this user in seenBy
-    const chatsWithUnread = await Promise.all(chats.map(async (chat) => {
+    const validChats = chats.filter(chat => 
+        chat.participants && chat.participants.every(p => p !== null)
+    );
+
+    const chatsWithUnread = await Promise.all(validChats.map(async (chat) => {
         const unreadCount = await Message.countDocuments({
             chatId: chat._id,
             senderId: { $ne: req.user.id },

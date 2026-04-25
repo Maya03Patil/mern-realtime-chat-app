@@ -6,6 +6,7 @@ import { Server } from "socket.io";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
+import errorHandler from "./middleware/errorMiddleware.js";
 
 dotenv.config();
 const app = express();
@@ -32,7 +33,7 @@ app.get("/", (req, res) => {
     res.send("Chat App Backend is running");
 });
 
-const onlineUsers = new Map(); // { userId -> Set of socketIds }
+const onlineUsers = new Map();
 
 io.on("connection", (socket) => {
     const userId = socket.handshake.query.userId;
@@ -108,6 +109,8 @@ io.on("connection", (socket) => {
 });
 
 connectDB();
+
+app.use(errorHandler);
 
 httpServer.listen(process.env.PORT, () => {
     console.log(`Server is running at http://localhost:${process.env.PORT}`);

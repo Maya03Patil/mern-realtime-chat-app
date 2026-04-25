@@ -15,11 +15,16 @@ const storage = multer.diskStorage({
     }
 });
 export const upload = multer({ storage });
-export const register = async (req, res) => {
+export const register = async (req, res, next) => {
     const { name, email, password, about, lastSeen, isOnline, phone } = req.body;
     const profilePic = req.file ? req.file.path : null;
     try {
-        const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
+        const query = { $or: [{ email }] };
+        if (phone && phone.trim() !== "") {
+            query.$or.push({ phone });
+        }
+
+        const existingUser = await User.findOne(query);
         if (existingUser) {
             return res.status(400).json({ message: "User already exists" });
         }
@@ -46,11 +51,11 @@ export const register = async (req, res) => {
         }
         res.status(201).json(safeUser);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Internal server error" });
+        next(error);
     }
 }
-export const login = async (req, res) => {
+
+export const login = async (req, res, next) => {
     const { identifier, password } = req.body;
     try {
         const user = await User.findOne({ $or: [{ email: identifier }, { phone: identifier }] });
@@ -71,25 +76,22 @@ export const login = async (req, res) => {
 
         res.status(200).json({ user: safeUser, token });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Internal server error" });
+        next(error);
     }
 }
 
-export const getAllUsers = async (req, res) => {
+export const getAllUsers = async (req, res, next) => {
     try {
-        // Return all users except the logged-in user
         const users = await User.find({ _id: { $ne: req.user.id } })
             .select("name email profilePic about")
             .sort({ name: 1 });
         res.status(200).json(users);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Internal server error" });
+        next(error);
     }
 }
 
-export const updateProfile = async (req, res) => {
+export const updateProfile = async (req, res, next) => {
     try {
         const { name, about } = req.body;
         const userId = req.user.id;
@@ -108,7 +110,6 @@ export const updateProfile = async (req, res) => {
 
         res.status(200).json(user);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Internal server error" });
+        next(error);
     }
 }
