@@ -1,13 +1,13 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-dotenv.config();
 import { createServer } from "http";
 import { Server } from "socket.io";
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 
+dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
@@ -24,32 +24,30 @@ app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static('uploads'));
+
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
+
 app.get("/", (req, res) => {
     res.send("Chat App Backend is running");
 });
 
-// Track online users: { userId -> Set of socketIds }
-const onlineUsers = new Map();
+const onlineUsers = new Map(); // { userId -> Set of socketIds }
 
 io.on("connection", (socket) => {
     const userId = socket.handshake.query.userId;
     if (userId) {
-        socket.join(`user_${userId}`); // Join personal room
+        socket.join(`user_${userId}`);
 
         if (!onlineUsers.has(userId)) {
             onlineUsers.set(userId, new Set());
         }
         onlineUsers.get(userId).add(socket.id);
 
-        // Broadcast updated online users list
         io.emit("getOnlineUsers", Array.from(onlineUsers.keys()));
-        console.log(`User connected: ${userId} (Total sockets: ${onlineUsers.get(userId).size})`);
     }
 
     socket.on("sendMessage", ({ chatId, message, participants }) => {
-        // Notify all participants to refresh their chat lists and receive the message
         if (participants && Array.isArray(participants)) {
             participants.forEach(pId => {
                 io.to(`user_${pId}`).emit("receiveMessage", { chatId, message });
@@ -65,7 +63,6 @@ io.on("connection", (socket) => {
     socket.on("typing", ({ chatId, userId, participants }) => {
         if (participants && Array.isArray(participants)) {
             participants.forEach(pId => {
-                // Don't send to self
                 if (String(pId) !== String(userId)) {
                     io.to(`user_${pId}`).emit("typing", { chatId, userId });
                 }
@@ -99,8 +96,6 @@ io.on("connection", (socket) => {
         }
     });
 
-
-
     socket.on("disconnect", () => {
         if (userId && onlineUsers.has(userId)) {
             onlineUsers.get(userId).delete(socket.id);
@@ -108,7 +103,6 @@ io.on("connection", (socket) => {
                 onlineUsers.delete(userId);
             }
             io.emit("getOnlineUsers", Array.from(onlineUsers.keys()));
-            console.log(`User disconnected: ${userId}`);
         }
     });
 });
@@ -116,7 +110,7 @@ io.on("connection", (socket) => {
 connectDB();
 
 httpServer.listen(process.env.PORT, () => {
-    console.log(`Server is running on port at http://localhost:${process.env.PORT}`);
+    console.log(`Server is running at http://localhost:${process.env.PORT}`);
 });
 
 export { io };

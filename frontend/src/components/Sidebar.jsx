@@ -3,6 +3,7 @@ import { Search, MoreVertical, MessageSquarePlus, Sun, Moon, Users, LogOut, Tras
 import { useNavigate, Link } from 'react-router-dom';
 import { createOrGetChatAPI, deleteChatAPI, toggleArchiveAPI, toggleMuteAPI } from '../services/api';
 import { getSocket } from '../services/socket';
+import { decryptMessage } from '../utils/encryption';
 import NewChatModal from './NewChatModal';
 
 const BASE_URL = 'http://localhost:4001';
@@ -270,7 +271,7 @@ export default function Sidebar({ currentUser, chats, setChats, selectedChat, se
                     {typingChats[chat._id] ? (
                       <span className="text-green-500 font-medium">typing...</span>
                     ) : (
-                      lastMsg?.text || 'No messages yet'
+                      lastMsg ? decryptMessage(lastMsg.text, chat._id) : 'No messages yet'
                     )}
                   </p>
                   <div className="flex items-center space-x-2 relative">

@@ -34,7 +34,17 @@ export const register = async (req, res) => {
             isOnline,
             phone
         });
-        res.status(201).json(user);
+        const safeUser = {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            profilePic: user.profilePic,
+            about: user.about,
+            lastSeen: user.lastSeen,
+            isOnline: user.isOnline,
+            phone: user.phone
+        }
+        res.status(201).json(safeUser);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Internal server error" });

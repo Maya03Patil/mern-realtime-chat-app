@@ -5,6 +5,7 @@ A modern, real-time chat application built with the MERN stack (MongoDB, Express
 ## ✨ Features
 
 - 📱 **Phone & Email Login**: Secure authentication with JWT.
+- 🔒 **End-to-End Encryption**: Messages are encrypted locally using AES-256 before sending.
 - 💬 **Real-time Messaging**: Instant message delivery using Socket.io.
 - 👥 **Group Chats**: Create and manage group conversations.
 - ✅ **Message Status**: Sent, Delivered, and Seen ticks.

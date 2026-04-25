@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Search, MoreVertical, Paperclip, Smile, Mic, Send, ArrowLeft, Check, CheckCheck, Loader, Trash2, ChevronDown, Reply, Copy } from 'lucide-react';
 import { getMessagesAPI, sendMessageAPI, markAsSeenAPI, deleteMessageAPI } from '../services/api';
 import { getSocket } from '../services/socket';
+import { encryptMessage, decryptMessage } from '../utils/encryption';
 
 const BASE_URL = 'http://localhost:4001';
 
@@ -11,12 +12,11 @@ export default function ChatArea({ chat, currentUser, onBack, onlineUsers = [], 
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [activeMenu, setActiveMenu] = useState(null); // Stores messageId
+  const [activeMenu, setActiveMenu] = useState(null);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const lastEmitRef = useRef(0);
 
-  // Close menu when clicking anywhere else
   useEffect(() => {
     const closeMenu = () => setActiveMenu(null);
     window.addEventListener('click', closeMenu);
@@ -24,10 +24,9 @@ export default function ChatArea({ chat, currentUser, onBack, onlineUsers = [], 
   }, []);
 
   const handleMarkAsSeen = async (force = false) => {
-    // Only call API if there are unread messages to avoid infinite loops, OR if forced (new message)
     if (!chat?._id) return;
     if (!force && (!chat.unreadCount || chat.unreadCount <= 0)) return;
-    
+
     try {
       await markAsSeenAPI(chat._id);
       if (fetchChats) fetchChats();
@@ -35,8 +34,6 @@ export default function ChatArea({ chat, currentUser, onBack, onlineUsers = [], 
       console.error("Mark as seen failed:", err);
     }
   };
-
-
 
   const myId = currentUser?.id || currentUser?._id;
   const other = chat?.participants?.find(p => p._id !== myId);
@@ -47,8 +44,6 @@ export default function ChatArea({ chat, currentUser, onBack, onlineUsers = [], 
     ? (chat.groupImage ? `${BASE_URL}/${chat.groupImage}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.groupName)}&background=128C7E&color=fff`)
     : (other?.profilePic ? `${BASE_URL}/${other.profilePic}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(other?.name || 'U')}&background=128C7E&color=fff`);
 
-  // Use the following for the status line in the render:
-  // {isTyping ? <span className="text-green-500 animate-pulse">typing...</span> : (chat.isGroup ? `${chat.participants?.length} members` : (isOtherOnline ? 'online' : 'offline'))}
 
   useEffect(() => {
     if (!chat?._id) return;
@@ -56,8 +51,13 @@ export default function ChatArea({ chat, currentUser, onBack, onlineUsers = [], 
     setLoading(true);
     getMessagesAPI(chat._id)
       .then(({ data }) => {
-        setMessages(data);
-        handleMarkAsSeen(); // Mark messages as seen when opening
+        // Decrypt messages for display
+        const decryptedMessages = data.map(m => ({
+          ...m,
+          text: decryptMessage(m.text, chat._id)
+        }));
+        setMessages(decryptedMessages);
+        handleMarkAsSeen();
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -68,7 +68,12 @@ export default function ChatArea({ chat, currentUser, onBack, onlineUsers = [], 
 
       socket.on('receiveMessage', ({ chatId, message }) => {
         if (String(chatId) === String(chat._id)) {
-          setMessages(prev => [...prev, message]);
+          // Decrypt incoming message
+          const decryptedMsg = {
+            ...message,
+            text: decryptMessage(message.text, chat._id)
+          };
+          setMessages(prev => [...prev, decryptedMsg]);
           handleMarkAsSeen(true);
         }
       });
@@ -110,19 +115,30 @@ export default function ChatArea({ chat, currentUser, onBack, onlineUsers = [], 
   const handleSend = async (e) => {
     e.preventDefault();
     if (!inputText.trim() || sending) return;
+    
     const text = inputText.trim();
+    const encryptedText = encryptMessage(text, chat._id);
+    
     setInputText('');
     setSending(true);
     try {
-      const { data } = await sendMessageAPI(chat._id, text);
-      setMessages(prev => [...prev, data]);
+      const { data } = await sendMessageAPI(chat._id, encryptedText);
+      
+      // Decrypt the response for local state
+      const decryptedData = {
+        ...data,
+        text: text // Use the original plain text for immediate local update
+      };
+      
+      setMessages(prev => [...prev, decryptedData]);
+      
       const socket = getSocket();
       if (socket) {
         const participantIds = chat.participants.map(p => p._id || p);
-        socket.emit('sendMessage', { 
-          chatId: chat._id, 
-          message: data, 
-          participants: participantIds 
+        socket.emit('sendMessage', {
+          chatId: chat._id,
+          message: data, // Send the ENCRYPTED message to others
+          participants: participantIds
         });
       }
     } catch (err) {
@@ -143,10 +159,10 @@ export default function ChatArea({ chat, currentUser, onBack, onlineUsers = [], 
       const socket = getSocket();
       if (socket) {
         const participantIds = chat.participants.map(p => p._id || p);
-        socket.emit('deleteMessage', { 
-          chatId: chat._id, 
-          messageId: msgId, 
-          participants: participantIds 
+        socket.emit('deleteMessage', {
+          chatId: chat._id,
+          messageId: msgId,
+          participants: participantIds
         });
       }
     } catch (err) {
@@ -238,9 +254,9 @@ export default function ChatArea({ chat, currentUser, onBack, onlineUsers = [], 
                     </span>
                     {renderStatus(msg)}
                   </div>
-                  
+
                   {/* Dropdown Menu Trigger */}
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setActiveMenu(activeMenu === msg._id ? null : msg._id);
@@ -252,14 +268,14 @@ export default function ChatArea({ chat, currentUser, onBack, onlineUsers = [], 
 
                   {/* Dropdown Menu */}
                   {activeMenu === msg._id && (
-                    <div 
+                    <div
                       className={`absolute ${isMine ? 'right-0' : 'left-0'} top-8 w-32 bg-white dark:bg-[#233138] rounded-md shadow-xl z-50 py-1 border border-gray-100 dark:border-transparent animate-in fade-in zoom-in duration-100`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button className="w-full text-left px-3 py-2 text-[13px] text-[var(--text-main)] hover:bg-gray-50 dark:hover:bg-[#182229] transition-colors flex items-center">
                         <Reply className="w-3.5 h-3.5 mr-2" /> Reply
                       </button>
-                      <button 
+                      <button
                         className="w-full text-left px-3 py-2 text-[13px] text-[var(--text-main)] hover:bg-gray-50 dark:hover:bg-[#182229] transition-colors flex items-center"
                         onClick={() => {
                           navigator.clipboard.writeText(msg.text);
@@ -269,7 +285,7 @@ export default function ChatArea({ chat, currentUser, onBack, onlineUsers = [], 
                         <Copy className="w-3.5 h-3.5 mr-2" /> Copy
                       </button>
                       {isMine && (
-                        <button 
+                        <button
                           onClick={() => handleDeleteMessage(msg._id)}
                           className="w-full text-left px-3 py-2 text-[13px] text-red-500 hover:bg-gray-50 dark:hover:bg-[#182229] transition-colors flex items-center border-t border-gray-100 dark:border-[#374248]"
                         >
@@ -315,7 +331,7 @@ export default function ChatArea({ chat, currentUser, onBack, onlineUsers = [], 
                   }
 
                   if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-                  
+
                   typingTimeoutRef.current = setTimeout(() => {
                     socket.emit('stopTyping', { chatId: chat._id, userId: myId, participants: participantIds });
                     typingTimeoutRef.current = null;
