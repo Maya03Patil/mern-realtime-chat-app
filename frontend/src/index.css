@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #128C7E;
+  --color-primary-dark: #075E54;
+  --color-primary-light: #25D366;
+  --color-secondary: #DCF8C6;
+  --color-background-light: #ECE5DD;
+  --color-background-dark: #111b21;
+  --color-surface-light: #ffffff;
+  --color-surface-dark: #202c33;
+  --color-border-light: #e9edef;
+  --color-border-dark: #222d34;
+  --color-text-light: #111b21;
+  --color-text-dark: #e9edef;
+  --color-text-muted-light: #667781;
+  --color-text-muted-dark: #8696a0;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  :root {
+    --bg-main: var(--color-background-light);
+    --bg-surface: var(--color-surface-light);
+    --border-color: var(--color-border-light);
+    --text-main: var(--color-text-light);
+    --text-muted: var(--color-text-muted-light);
+  }
+
+  .dark {
+    --bg-main: var(--color-background-dark);
+    --bg-surface: var(--color-surface-dark);
+    --border-color: var(--color-border-dark);
+    --text-main: var(--color-text-dark);
+    --text-muted: var(--color-text-muted-dark);
+  }
+
+  body {
+    @apply bg-[var(--bg-main)] text-[var(--text-main)] antialiased transition-colors duration-200;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.chat-bubble-receive {
+  border-top-left-radius: 0;
+}
+
+.chat-bubble-send {
+  border-top-right-radius: 0;
+}
