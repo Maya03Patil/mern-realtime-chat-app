@@ -1,6 +1,6 @@
 import CryptoJS from 'crypto-js';
 
-const SECRET_SALT = "chatsphere-e2ee-salt-2024";
+const SECRET_SALT = import.meta.env.VITE_SECRET_SALT || "development-fallback-salt";
 
 export const encryptMessage = (text, chatId) => {
   if (!text) return "";
